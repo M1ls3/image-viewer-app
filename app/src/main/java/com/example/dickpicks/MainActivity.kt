@@ -1,5 +1,7 @@
 package com.example.dickpicks
 
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -37,26 +39,26 @@ class MainActivity : AppCompatActivity() {
 
         imageView = findViewById(R.id.imageView)
 
-        // Завантажуємо список зображень з assets/images/
+        // Завантаження зображень з assets/images/
         images = loadImagesFromAssets()
 
         // Відображаємо перше зображення
         if (images.isNotEmpty()) {
-            setImageWithAnimation(images[currentIndex])
+            setImageBitmapFromAssets(images[currentIndex])
         }
 
-        // Обробка жестів: натискання, свайпи, масштабування
+        // Налаштовуємо обробку жестів: натискання, свайпи, масштабування
         gestureDetector = GestureDetector(this, GestureListener())
         scaleGestureDetector = ScaleGestureDetector(this, ScaleListener())
 
-        // Обробка торкань екрану
         imageView.setOnTouchListener { _, event ->
             scaleGestureDetector.onTouchEvent(event)
             gestureDetector.onTouchEvent(event)
             true
         }
-}
-    // Завантаження списку картинок з assets/images/
+    }
+
+    // Завантаження списку файлів з assets/images/
     private fun loadImagesFromAssets(): List<String> {
         return try {
             val assetManager: AssetManager = assets
@@ -85,24 +87,54 @@ class MainActivity : AppCompatActivity() {
         imageView.scaleY = 1.0f
     }
 
+    // Обробка свайпу із анімацією
+    private fun animateSwipe(direction: Int) {
+        // direction: 1 для свайпу вправо (наступна картинка), -1 для свайпу вліво (попередня)
+        val width = imageView.width.toFloat()
+        val exitTranslation = if (direction == 1) width else -width
 
-    // Встановлення зображення з анімацією
-    private fun setImageWithAnimation(imageName: String) {
-        try {
-            val inputStream: InputStream = assets.open("images/$imageName")
-            val bitmap: Bitmap = BitmapFactory.decodeStream(inputStream)
+        // Анімація виходу поточного зображення
+        imageView.animate()
+            .translationX(exitTranslation)
+            .setDuration(100)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    // Оновлюємо індекс зображення циклічно
+                    currentIndex = when (direction) {
+                        1 -> (currentIndex + 1) % images.size
+                        -1 -> if (currentIndex - 1 < 0) images.size - 1 else currentIndex - 1
+                        else -> currentIndex
+                    }
+                    // Завантажуємо нове зображення
+                    setImageBitmapFromAssets(images[currentIndex])
+                    // Встановлюємо зображення поза екраном для в'їзду
+                    imageView.translationX = if (direction == 1) -width else width
+                    // Анімація входу зображення до центру
+                    imageView.animate()
+                        .translationX(0f)
+                        .setDuration(100)
+                        .setInterpolator(AccelerateDecelerateInterpolator())
+                        .setListener(null)
+                        .start()
+                }
+            }).start()
+    }
 
-            // Анімація натискання (ефект натискання кнопки)
+    // Клас обробки жестів
+    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
+        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
+            // Натискання показує випадкове зображення з ефектом натискання
+            val randomIndex = Random.nextInt(images.size)
+            // Анімація натискання схожа на анімацію кнопки
             val shrinkX = ObjectAnimator.ofFloat(imageView, "scaleX", 1f, 0.9f)
             val shrinkY = ObjectAnimator.ofFloat(imageView, "scaleY", 1f, 0.9f)
             val expandX = ObjectAnimator.ofFloat(imageView, "scaleX", 0.9f, 1f)
             val expandY = ObjectAnimator.ofFloat(imageView, "scaleY", 0.9f, 1f)
-
             shrinkX.duration = 100
             shrinkY.duration = 100
             expandX.duration = 100
             expandY.duration = 100
-
             shrinkX.interpolator = AccelerateDecelerateInterpolator()
             shrinkY.interpolator = AccelerateDecelerateInterpolator()
             expandX.interpolator = AccelerateDecelerateInterpolator()
@@ -113,20 +145,8 @@ class MainActivity : AppCompatActivity() {
             expandX.start()
             expandY.start()
 
-            imageView.setImageBitmap(bitmap)
-            scaleFactor = 1.0f // Скидаємо масштаб при зміні картинки
-            imageView.scaleX = 1.0f
-            imageView.scaleY = 1.0f
-        } catch (e: IOException) {
-            e.printStackTrace()
-        }
-    }
-
-    // Обробка свайпів і натискання
-    private inner class GestureListener : GestureDetector.SimpleOnGestureListener() {
-        override fun onSingleTapConfirmed(e: MotionEvent): Boolean {
-            val randomIndex = Random.nextInt(images.size)
-            setImageWithAnimation(images[randomIndex])
+            currentIndex = randomIndex
+            setImageBitmapFromAssets(images[currentIndex])
             return true
         }
 
@@ -137,16 +157,14 @@ class MainActivity : AppCompatActivity() {
             velocityY: Float
         ): Boolean {
             if (e1 == null || e2 == null) return false
-
             val deltaX = e2.x - e1.x
             if (deltaX > 100) {
                 // Свайп вправо (наступна картинка)
-                currentIndex = (currentIndex + 1) % images.size
+                animateSwipe(1)
             } else if (deltaX < -100) {
                 // Свайп вліво (попередня картинка)
-                currentIndex = if (currentIndex - 1 < 0) images.size - 1 else currentIndex - 1
+                animateSwipe(-1)
             }
-            setImageWithAnimation(images[currentIndex])
             return true
         }
     }
@@ -155,7 +173,7 @@ class MainActivity : AppCompatActivity() {
     private inner class ScaleListener : ScaleGestureDetector.SimpleOnScaleGestureListener() {
         override fun onScale(detector: ScaleGestureDetector): Boolean {
             scaleFactor *= detector.scaleFactor
-            scaleFactor = max(0.5f, min(scaleFactor, 3.0f)) // Обмеження масштабу
+            scaleFactor = max(0.5f, min(scaleFactor, 3.0f))
             imageView.scaleX = scaleFactor
             imageView.scaleY = scaleFactor
             return true
