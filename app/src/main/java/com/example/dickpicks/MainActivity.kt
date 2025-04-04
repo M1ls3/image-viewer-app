@@ -3,18 +3,15 @@ package com.example.dickpicks
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.os.Bundle
-import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowInsetsCompat
 import android.animation.ObjectAnimator
-import android.annotation.SuppressLint
 import android.content.res.AssetManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
+import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.ImageView
 import java.io.IOException
@@ -37,6 +34,14 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
+        window.decorView.systemUiVisibility = (
+                View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        or View.SYSTEM_UI_FLAG_FULLSCREEN
+                        or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        or View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        or View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                )
+
         imageView = findViewById(R.id.imageView)
 
         // Завантаження зображень з assets/images/
@@ -44,7 +49,7 @@ class MainActivity : AppCompatActivity() {
 
         // Відображаємо перше зображення
         if (images.isNotEmpty()) {
-            setImageBitmapFromAssets(images[currentIndex])
+            setImageBitmapFromAssets(images[Random.nextInt(images.size)])
         }
 
         // Налаштовуємо обробку жестів: натискання, свайпи, масштабування
@@ -62,7 +67,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadImagesFromAssets(): List<String> {
         return try {
             val assetManager: AssetManager = assets
-            assetManager.list("images")?.toList() ?: emptyList()
+            assetManager.list("topimages")?.toList() ?: emptyList()
         } catch (e: IOException) {
             emptyList()
         }
@@ -71,7 +76,7 @@ class MainActivity : AppCompatActivity() {
     // Встановлення зображення без анімації (просто для оновлення контенту)
     private fun setImageBitmapFromAssets(imageName: String) {
         try {
-            val inputStream: InputStream = assets.open("images/$imageName")
+            val inputStream: InputStream = assets.open("topimages/$imageName")
             val bitmap: Bitmap = BitmapFactory.decodeStream(inputStream)
             imageView.setImageBitmap(bitmap)
             resetScale()
